@@ -1,0 +1,65 @@
+#!/bin/bash
+
+round ()
+{
+echo $(printf %.$2f $(echo "scale=$2;(((10^$2)*$1)+0.5)/(10^$2)" | bc))
+}
+
+[ -d ./SAC_DATA ] && rm -f SAC_DATA/* || mkdir SAC_DATA
+
+for data in `ls * | grep -v $0 | grep -v */`; do
+	date=`grep -w "Origin Time" $data | head -1 | awk '{print $4}'`
+	time=`grep -w "Origin Time" $data | head -1 | awk '{print $5}'`
+	Y=`echo $date | cut -f 1 -d "/"`
+	J=`date -d "$date" +%j`
+	h=`echo $time | cut -f 1 -d ":"`
+	m=`echo $time | cut -f 2 -d ":"`
+	s=`echo $time | cut -f 3 -d ":"`0
+	stinfo=`grep -w "Station" $data | head -1`
+	stla=`echo $stinfo | awk '{print $3}'`
+	stlo=`echo $stinfo | awk '{print $5}'`
+	stel=`echo $stinfo | awk '{print $8}' | cut -f 1 -d "m"`
+	evinfo=`grep -w "Epicenter" $data | head -1`
+	evla=`echo $evinfo | awk '{print $2}'`
+	evlo=`echo $evinfo | awk '{print $4}'`
+	evdp=`echo $evinfo | awk '{print $7}'`
+	npts=`grep -w "NO. OF POINTS =" $data | head -1 | awk '{print $5}'`
+	dura=`grep -w "NO. OF POINTS =" $data | head -1 | awk '{print $8}'`
+	delta=`echo "$dura / $npts" | tr -d $'\r' | bc -l` && delta=`round $delta 3`
+	# tr -d $'\r'  added to strip out unwanted characters included in variables from other languages like C++
+	
+	read -a Rows <<< `grep -n "/&" $data | cut -f 1 -d :`
+	awk -v i=1 -v j=${Rows[0]} 'NR > i && NR < j' $data > .${data%.*}.L.tmp
+	awk -v i=$((${Rows[0]} + 1)) -v j=${Rows[1]} 'NR > i && NR < j' $data > .${data%.*}.V.tmp
+	awk -v i=$((${Rows[1]} + 1)) -v j=${Rows[2]} 'NR > i && NR < j' $data > .${data%.*}.T.tmp
+	
+	for comp in `ls .*tmp`; do
+		LL=`cat $comp | tail -1`
+		grep '^ -.\|^  .' $comp | grep -v '^    0' | awk '$10 != ""' > .${comp%.*}.txt
+		echo "$LL" >> .${comp%.*}.txt
+		read -a Content <<< `cat .${comp%.*}.txt`
+		echo ${Content[@]} | tr " " "\n" > .${comp%.*}.SC.txt	
+	done	
+	
+	for data in `ls .*SC.txt`; do
+	name=${data#*..}
+	sac <<- EOF
+	readtable $data
+	ch DELTA $delta
+	ch NZYEAR $Y
+	ch NZJDAY $J
+	ch NZHOUR $h
+	ch NZMIN $m
+	ch NZSEC $s	
+	ch STLA $stla
+	ch STLO $stlo
+	ch STEL $stel
+	ch EVLA $evla
+	ch EVLO $evlo
+	ch EVDP $evdp
+	w SAC_DATA/${name%.*}.SAC
+	q
+	EOF
+	done	
+	rm .* 2> /dev/null
+done
