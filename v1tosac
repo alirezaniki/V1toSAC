@@ -7,7 +7,7 @@ echo $(printf %.$2f $(echo "scale=$2;(((10^$2)*$1)+0.5)/(10^$2)" | bc))
 
 [ -d ./SAC_DATA ] && rm -f SAC_DATA/* || mkdir SAC_DATA
 
-for data in `ls * | grep -v $0 | grep -v */`; do
+for data in `ls *V1`; do
 	date=`grep -w "Origin Time" $data | head -1 | awk '{print $4}'`
 	time=`grep -w "Origin Time" $data | head -1 | awk '{print $5}'`
 	Y=`echo $date | cut -f 1 -d "/"`
