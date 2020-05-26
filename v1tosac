@@ -19,6 +19,10 @@ for data in `ls *V1`; do
 	stla=`echo $stinfo | awk '{print $3}'`
 	stlo=`echo $stinfo | awk '{print $5}'`
 	stel=`echo $stinfo | awk '{print $8}' | cut -f 1 -d "m"`
+	stLA=`echo $stinfo | awk '{print $11}'`
+	stTA=`echo $stinfo | awk '{print $13}'`
+	stIN=`echo "$stTA - $stLA" | bc -l`
+	(( `echo "$stIN < 0" | bc -l` )) && stIN=`echo "$stIN * -1" | bc -l`
 	evinfo=`grep -w "Epicenter" $data | head -1`
 	evla=`echo $evinfo | awk '{print $2}'`
 	evlo=`echo $evinfo | awk '{print $4}'`
@@ -35,14 +39,21 @@ for data in `ls *V1`; do
 	
 	for comp in `ls .*tmp`; do
 		LL=`cat $comp | tail -1`
-		grep '^ -.\|^  .' $comp | grep -v '^    0' | awk '$10 != ""' > .${comp%.*}.txt
-		echo "$LL" >> .${comp%.*}.txt
-		read -a Content <<< `cat .${comp%.*}.txt`
-		echo ${Content[@]} | tr " " "\n" > .${comp%.*}.SC.txt	
+		grep '^ -.\|^  .' $comp | grep -v '^    0' | awk '$10 != ""' > ${comp%.*}.txt
+		echo "$LL" >> ${comp%.*}.txt
+		read -a Content <<< `cat ${comp%.*}.txt`
+		echo ${Content[@]} | tr " " "\n" > ${comp%.*}.SC.txt	
 	done	
 	
 	for data in `ls .*SC.txt`; do
-	name=${data#*..}
+	name=${data#*.}
+	if [[ "$name" == *".T."* ]]; then
+		CaZ="$stTA" && INC="$stIN"
+	elif [[ "$name" == *".L."* ]]; then
+		CaZ="$stLA" && INC="$stIN"
+	else
+		CaZ="0" && INC="0"
+	fi	
 	sac <<- EOF
 	readtable $data
 	ch DELTA $delta
@@ -57,6 +68,8 @@ for data in `ls *V1`; do
 	ch EVLA $evla
 	ch EVLO $evlo
 	ch EVDP $evdp
+	ch CMPAZ $CaZ
+	ch CMPINC $INC
 	w SAC_DATA/${name%.*}.SAC
 	q
 	EOF
